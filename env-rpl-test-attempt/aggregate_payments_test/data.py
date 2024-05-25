@@ -1,10 +1,14 @@
+import os
+
 from bson import decode_all
 from bson.raw_bson import RawBSONDocument
 from pathlib import Path
 
+data = Path(os.path.dirname(__file__)) / "data"
+
 
 class BSONReader:
-    path = Path("data")
+    path = data
     file_name = "sample_collection.bson"
 
     def __init__(self, file_name=""):

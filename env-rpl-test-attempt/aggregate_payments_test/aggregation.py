@@ -38,6 +38,9 @@ pipeline = [
         },
     },
     {
+        "$sort": {"_id.label": 1},
+    },
+    {
         "$group": {
             "_id": None,
             "dataset": {"$push": "$total_payments"},

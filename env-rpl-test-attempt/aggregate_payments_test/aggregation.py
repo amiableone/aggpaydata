@@ -22,4 +22,18 @@ pipeline = [
             },
         },
     },
+    {
+        # Group by the beginning of the period that each document relates to
+        # based on provided group_type.
+        "$group": {
+            "_id": {
+                "trunc_date": {
+                    "$dateTrunc": {
+                        "date": "$dt",
+                        "unit": input_data["group_type"],
+                    },
+                },
+            },
+        },
+    },
 ]

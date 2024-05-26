@@ -27,13 +27,21 @@ pipeline = [
         # based on provided group_type.
         "$group": {
             "_id": {
-                "trunc_date": {
+                "label": {
                     "$dateTrunc": {
                         "date": "$dt",
                         "unit": input_data["group_type"],
                     },
                 },
             },
+            "total_payments": {"$sum": "$value"},
+        },
+    },
+    {
+        "$group": {
+            "_id": None,
+            "dataset": {"$push": "$total_payments"},
+            "lables": {"$push": "$_id.label"},
         },
     },
 ]

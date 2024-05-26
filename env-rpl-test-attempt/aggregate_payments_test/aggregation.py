@@ -41,11 +41,20 @@ pipeline = [
         "$sort": {"_id.label": 1},
     },
     {
+        # Pivot total_payments and _id.label data.
         "$group": {
             "_id": None,
             "dataset": {"$push": "$total_payments"},
-            "lables": {"$push": "$_id.label"},
+            "labels": {
+                "$push": {
+                    "$dateToString": {
+                        "date": "$_id.label",
+                        "format": "%Y-%m-%dT%H:%M:%S",
+                    },
+                },
+            },
         },
     },
+    # Exclude _id field from output.
     {"$project": {"_id": 0}},
 ]

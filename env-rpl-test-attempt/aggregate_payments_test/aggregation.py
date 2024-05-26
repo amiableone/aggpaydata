@@ -47,4 +47,5 @@ pipeline = [
             "lables": {"$push": "$_id.label"},
         },
     },
+    {"$project": {"_id": 0}},
 ]

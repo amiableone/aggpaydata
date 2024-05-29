@@ -1,4 +1,5 @@
 import json
+import urllib.parse
 import urllib.request
 
 from typing import Optional, Dict, Callable
@@ -58,11 +59,28 @@ class BotBase:
             raise ValueError("token must be a non-empty string")
         self.token = token
 
-    def get(self):
-        pass
+    def get(self, method):
+        url = self.get_url(method)
+        with urllib.request.urlopen(url) as response:
+            contents = response.read()
+            contents = json.loads(contents)
+        return contents
 
-    def post(self):
-        pass
+    def post(self, method, data, headers={}):
+        if not isinstance(data, dict):
+            raise ValueError("data must be dict")
+        if not isinstance(headers, dict):
+            raise ValueError("headers must be dict")
+        url = self.get_url(method)
+        bdata = urllib.parse.urlencode(data).encode()
+        initial_headers = {
+            "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+        }
+        headers.update(initial_headers)
+        request = urllib.request.Request(url, bdata, headers)
+        with urllib.request.urlopen(request) as response:
+            contents = json.loads(response.read())
+        return contents
 
     def get_url(self, method):
         return self.url % (self.token, method)
@@ -114,13 +132,12 @@ class BotCommandManagerMixin:
             return self._commands_are_set, None
         except AttributeError:
             try:
-                url = self.get_url(self.get_my_commands)
+                res = self.get(self.get_my_commands)
             except AttributeError:
-                raise AttributeError("Use as base together with BotBase")
-            with urllib.request.urlopen(url) as response:
-                commands = response.read()
-                commands = json.loads(commands)
-            if commands["ok"]:
+                raise TypeError(
+                    f"Probably forgot to use BotBase as base for this instance type"
+                )
+            if res["ok"]:
                 # check if command list is not empty
-                self._commands_are_set = bool(commands["result"])
-                return self._commands_are_set, commands["result"]
+                self._commands_are_set = bool(res["result"])
+                return self._commands_are_set, res["result"]

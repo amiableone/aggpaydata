@@ -81,7 +81,7 @@ class BotCommandManagerMixin:
         for command, callback in commands_callbacks.items():
             try:
                 cmd_class = type(
-                    command.title(),
+                    command.capitalize(),
                     (BotCommandBase,),
                     {},
                 )
@@ -89,10 +89,11 @@ class BotCommandManagerMixin:
                 value = self.commands.setdefault(command, cmd_instance)
                 if value == cmd_instance:
                     cmd_instance.register_callback(callback)
-                    res.append(f"succes: {command}")
-            except (AttributeError, TypeError):
-                res.append(f"failed: command must be str, not {type(command)}")
+                    res.append(f"succes: /{command}")
+                else:
+                    res.append(f"failed: command /{command} already exists")
             except ValueError:
+                # register_callback raised ValueError.
                 res.append(f"failed: callback must be callable, not {type(callback)}")
         # Return success status of each command.
         return res

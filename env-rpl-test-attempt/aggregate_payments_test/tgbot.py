@@ -5,11 +5,21 @@ from typing import Optional, Dict, Callable
 
 
 class BotCommandBase:
+    _description = ""
     callback: Optional[Callable] = None
 
     @property
     def command(self):
         return self.__class__.__name__.lower()
+
+    @property
+    def description(self):
+        return self._description
+
+    @description.setter
+    def description(self, desc):
+        if isinstance(desc, str):
+            self._description = desc.capitalize()[:25]
 
     def register_callback(self, callback):
         """

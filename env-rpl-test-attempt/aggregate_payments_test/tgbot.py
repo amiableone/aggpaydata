@@ -2,6 +2,7 @@ import json
 import urllib.parse
 import urllib.request
 
+from datetime import datetime, timedelta
 from typing import Optional, Dict, Callable
 
 
@@ -135,9 +136,73 @@ class BotCommandManagerMixin:
                 res = self.get(self.get_my_commands)
             except AttributeError:
                 raise TypeError(
-                    f"Probably forgot to use BotBase as base for this instance type"
+                    f"BotBase must be base of this instance type for this method to work"
                 )
             if res["ok"]:
                 # check if command list is not empty
                 self._commands_are_set = bool(res["result"])
                 return self._commands_are_set, res["result"]
+
+
+class BotUpdateManagerMixin:
+    allowed_updates = ["message", "edited_message"]
+    _get_updates = "getUpdates"
+    last_update_date = None
+    limit = 100
+    last_update_id = 0
+    offset = 1
+    reset_period = timedelta(days=7)
+    timeout = 10
+    updates = []
+
+    @classmethod
+    def recalculate_lud(cls, date):
+        cls.last_update_date = date
+
+    @classmethod
+    def recalculate_luid(cls, luid):
+        if datetime.today() - cls.last_update_date <= cls.reset_period:
+            cls.last_update_id = max(cls.last_update_id, luid)
+        else:
+            cls.last_update_id = luid
+
+    @classmethod
+    def recalculate_offset(cls):
+        cls.offset = cls.last_update_id + 1
+
+    @classmethod
+    def reset_period_expired(cls):
+        try:
+            lud = datetime.fromtimestamp(cls.last_update_date)
+            return datetime.today() - lud > cls.reset_period
+        except TypeError:
+            return False
+
+    def get_updates(self):
+        data = self._get_request_data()
+        bdata = urllib.parse.urlencode(data).encode()
+        try:
+            res = self.get(self._get_updates)
+        except AttributeError:
+            raise TypeError(
+                f"BotBase must be base of this instance type for this method to work"
+            )
+        if res["ok"]:
+            self.updates = res["result"][::-1]
+
+    def _get_request_data(self):
+        return {
+            "offset": self.offset,
+            "limit": self.limit,
+            "timeout": self.timeout,
+            "allowed_updates": self.allowed_updates,
+        }
+
+    def process_updates(self):
+        for update in updates:
+            # Retrive relevant data from update
+            update_id = update["update_id"]
+            try:
+                message = update["message"]
+            except KeyError:
+                message = update["edited_message"]

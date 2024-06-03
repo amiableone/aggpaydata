@@ -156,23 +156,25 @@ class BotUpdateManagerMixin:
     allowed_updates = ["message", "edited_message"]
     _get_updates = "getUpdates"
     last_update_date = None
-    limit = 100
     last_update_id = 0
+    limit = 100
     offset = 1
     reset_period = timedelta(days=7)
     timeout = 10
     updates = []
+    messages = []
 
     @classmethod
     def recalculate_lud(cls, date):
+        """date is param of update object from Telegram Bot API"""
         cls.last_update_date = date
 
     @classmethod
     def recalculate_luid(cls, luid):
-        if datetime.today() - cls.last_update_date <= cls.reset_period:
-            cls.last_update_id = max(cls.last_update_id, luid)
-        else:
+        if cls.reset_period_expired():
             cls.last_update_id = luid
+        else:
+            cls.last_update_id = max(cls.last_update_id, luid)
 
     @classmethod
     def recalculate_offset(cls):
@@ -188,15 +190,14 @@ class BotUpdateManagerMixin:
 
     def get_updates(self):
         data = self._get_request_data()
-        bdata = urllib.parse.urlencode(data).encode()
         try:
-            res = self.get(self._get_updates)
+            res = self.get(self._get_updates, data)
         except AttributeError:
             raise TypeError(
                 f"BotBase must be base of this instance type for this method to work"
             )
         if res["ok"]:
-            self.updates = res["result"][::-1]
+            self.updates = res["result"]
 
     def _get_request_data(self):
         return {
@@ -207,10 +208,19 @@ class BotUpdateManagerMixin:
         }
 
     def process_updates(self):
-        for update in updates:
-            # Retrive relevant data from update
-            update_id = update["update_id"]
+        update_id = 0
+        for update in self.updates:
+            update_id = max(update["update_id"], update_id)
             try:
                 message = update["message"]
             except KeyError:
                 message = update["edited_message"]
+            user_input = json.loads(message["text"])
+            if isinstance(user_input, dict):
+                self.messages.append(message)
+        self.updates = []
+        # Update class attributes
+        date = update.get("date", update.get("edit_date"))
+        self.__class__.recalculate_lud(date)
+        self.__class__.recalculate_luid(update_id)
+        self.__class__.recalculate_offset()

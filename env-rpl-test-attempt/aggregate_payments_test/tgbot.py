@@ -65,8 +65,11 @@ class BotBase:
             raise ValueError("token must be a non-empty string")
         self.token = token
 
-    def get(self, method):
+    def get(self, method, data={}):
         url = self.get_url(method)
+        if data and isinstance(data, dict):
+            data = urllib.parse.urlencode(data)
+            url += "?" + data
         with urllib.request.urlopen(url) as response:
             contents = response.read()
             contents = json.loads(contents)

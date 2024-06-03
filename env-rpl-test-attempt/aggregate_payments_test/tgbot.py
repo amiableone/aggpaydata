@@ -10,6 +10,11 @@ class BotCommandBase:
     _description = ""
     callback: Optional[Callable] = None
 
+    def __init__(self, callback=None, description=None):
+        if callback:
+            self.register_callback(callback)
+        self.description = description
+
     @property
     def command(self):
         return self.__class__.__name__.lower()

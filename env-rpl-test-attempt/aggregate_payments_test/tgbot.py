@@ -31,7 +31,7 @@ class BotCommandBase:
         """
         Register callback to make instance callable.
         """
-        if not isinstance(callback, Callable):
+        if not callable(callback):
             raise ValueError("callback must be callable")
         self.callback = callback
 
@@ -49,10 +49,6 @@ class Help(BotCommandBase):
 
 class Settings(BotCommandBase):
     pass
-
-
-start = Start()
-print(start.command)
 
 
 class BotBase:

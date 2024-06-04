@@ -4,6 +4,7 @@ import json
 
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Callable
+from urllib.parse import urlencode
 
 
 class BotCommandBase:
@@ -78,35 +79,30 @@ class BotBase:
         self._stop_session = None
         self.is_running = False
 
-    def get(self, method, data={}):
-        url = self.get_url(method)
+    async def get(self, method, data={}):
         if data and isinstance(data, dict):
-            data = urllib.parse.urlencode(data)
-            url += "?" + data
-        with urllib.request.urlopen(url) as response:
-            contents = response.read()
+            data = "?" + urlencode(data)
+        url = self.token + self.method % method + data
+        async with self.session.get(url) as response:
+            contents = await response.read()
             contents = json.loads(contents)
         return contents
 
-    def post(self, method, data, headers={}):
+    async def post(self, method, data, headers={}):
         if not isinstance(data, dict):
             raise ValueError("data must be dict")
         if not isinstance(headers, dict):
             raise ValueError("headers must be dict")
-        url = self.get_url(method)
-        bdata = urllib.parse.urlencode(data).encode()
-        initial_headers = {
+        url = self.token + self.method % method
+        bdata = urlencode(data).encode()
+        _headers = {
             "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
         }
-        headers.update(initial_headers)
-        request = urllib.request.Request(url, bdata, headers)
-        with urllib.request.urlopen(request) as response:
-            contents = json.loads(response.read())
+        _headers.update(headers)
+        async with self.session.post(url, data=bdata, headers=_headers) as response:
+            contents = await response.read()
+            contents = json.loads(contents)
         return contents
-
-    def get_url(self, method):
-        return self.url % (self.token, method)
-
 
 
 class BotCommandManagerMixin:

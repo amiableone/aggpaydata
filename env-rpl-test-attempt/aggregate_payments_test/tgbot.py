@@ -1,6 +1,6 @@
+import aiohttp
+import asyncio
 import json
-import urllib.parse
-import urllib.request
 
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Callable
@@ -52,13 +52,30 @@ class Settings(BotCommandBase):
 
 
 class BotBase:
-    token = ""
-    url = "https://api.telegram.org/bot%s/%s"
+    base_url = "https://api.telegram.org"
+    token = "/bot%s"
+    method = "/%s"
 
     def __init__(self, token):
         if not token or not isinstance(token, str):
             raise ValueError("token must be a non-empty string")
-        self.token = token
+        self.token %= token
+        self.session = None
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self.is_running = False
+        self._stop_session: Optional[asyncio.Future] = None
+
+    async def run(self):
+        async with aiohttp.ClientSession(self.base_url) as session:
+            self.session = session
+            self._loop = asyncio.get_running_loop()
+            self.is_running = True
+            self._stop_session = self._loop.create_future()
+            await self._stop_session
+
+    def stop_session(self):
+        self._stop_session.set_result(None)
+        self.is_running = False
 
     def get(self, method, data={}):
         url = self.get_url(method)

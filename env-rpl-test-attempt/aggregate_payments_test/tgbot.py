@@ -11,8 +11,7 @@ class BotCommandBase:
     callback: Optional[Callable] = None
 
     def __init__(self, callback=None, description=None):
-        if callback:
-            self.register_callback(callback)
+        self.register_callback(callback)
         self.description = description
 
     @property
@@ -102,7 +101,10 @@ class BotCommandManagerMixin:
     settings (optional).
     """
     commands: Dict[str, BotCommandBase] = {}
-    get_my_commands = "getMyCommands"
+    _commands_are_set = False
+    _check_valid_for = timedelta(days=1)
+    _last_checked: Optional[datetime] = None
+    _get_commands = "getMyCommands"
 
     def add_start(self, callback):
         self.add_commands(start=callback)
@@ -114,7 +116,7 @@ class BotCommandManagerMixin:
         self.add_commands(settings=callback)
 
     def add_commands(self, **commands_callbacks):
-        res = []
+        success = {}
         for command, callback in commands_callbacks.items():
             try:
                 cmd_class = type(
@@ -122,34 +124,41 @@ class BotCommandManagerMixin:
                     (BotCommandBase,),
                     {},
                 )
-                cmd_instance = cmd_class()
+                cmd_instance = cmd_class(callback)
                 value = self.commands.setdefault(command, cmd_instance)
-                if value == cmd_instance:
-                    cmd_instance.register_callback(callback)
-                    res.append(f"succes: /{command}")
-                else:
-                    res.append(f"failed: command /{command} already exists")
+                success[command] = True if value == cmd_instance else False
             except ValueError:
                 # register_callback raised ValueError.
-                res.append(f"failed: callback must be callable, not {type(callback)}")
+                success.append(f"failed: callback must be callable, not {type(callback)}")
+        self.__class__._commands_are_set = not any(success.values())
         # Return success status of each command.
-        return res
+        return success
 
     @property
     def commands_are_set(self):
+        if datetime.today() - self._check_valid_for < self._last_checked:
+            return self._commands_are_set
+        else:
+            cmds = self.get_commands()
+            if cmds:
+                for command in self.commands.keys():
+                    if command not in cmds:
+                        self.__class__._commands_are_set = False
+                        return False
+                self.__class__._commands_are_set = True
+                return True
+
+    def get_commands(self):
         try:
-            return self._commands_are_set, None
-        except AttributeError:
-            try:
-                res = self.get(self.get_my_commands)
-            except AttributeError:
-                raise TypeError(
-                    f"BotBase must be base of this instance type for this method to work"
-                )
+            res = self.get(self._get_commands)
             if res["ok"]:
-                # check if command list is not empty
-                self._commands_are_set = bool(res["result"])
-                return self._commands_are_set, res["result"]
+                self.__class__._last_checked = datetime.today()
+                return res["result"]
+        except AttributeError:
+            raise TypeError(
+                f"BotBase must be base of this instance class"
+            )
+
 
 
 class BotUpdateManagerMixin:

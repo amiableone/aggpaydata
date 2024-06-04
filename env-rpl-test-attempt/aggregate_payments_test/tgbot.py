@@ -75,6 +75,7 @@ class BotBase:
 
     def stop_session(self):
         self._stop_session.set_result(None)
+        self._stop_session = None
         self.is_running = False
 
     def get(self, method, data={}):

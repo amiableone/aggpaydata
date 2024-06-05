@@ -106,10 +106,8 @@ class BotCommandManagerMixin:
     This mixin adds command managing features to BotBase subclass.
     """
     commands: Dict[str, BotCommandBase] = {}
-    _commands_are_set = False
-    _check_valid_for = timedelta(days=1)
-    _last_checked: Optional[datetime] = None
     _get_commands = "getMyCommands"
+    all_set = False
 
     def add_start(self, callback):
         self.add_commands(start=callback)
@@ -135,29 +133,14 @@ class BotCommandManagerMixin:
             except ValueError:
                 # register_callback raised ValueError.
                 success.append(f"failed: callback must be callable, not {type(callback)}")
-        self.__class__._commands_are_set = not any(success.values())
+        self.__class__.all_set = not bool(success.values())
         # Return success status of each command.
         return success
 
-    @property
-    def commands_are_set(self):
-        if datetime.today() - self._check_valid_for < self._last_checked:
-            return self._commands_are_set
-        else:
-            cmds = self.get_commands()
-            if cmds:
-                for command in self.commands.keys():
-                    if command not in cmds:
-                        self.__class__._commands_are_set = False
-                        return False
-                self.__class__._commands_are_set = True
-                return True
-
-    def get_commands(self):
+    async def get_commands(self):
         try:
-            res = self.get(self._get_commands)
+            res = await self.get(self._get_commands)
             if res["ok"]:
-                self.__class__._last_checked = datetime.today()
                 return res["result"]
         except AttributeError:
             raise TypeError(

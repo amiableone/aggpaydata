@@ -37,7 +37,7 @@ class BotCommandBase:
         Register callback to make instance callable.
         """
         if not callable(callback):
-            raise ValueError("callback must be callable")
+            raise TypeError("callback must be callable")
         self.callback = callback
 
     def __call__(self, *args, **kwargs):

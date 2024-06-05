@@ -95,11 +95,11 @@ class BotBase:
             raise ValueError("headers must be dict")
         url = self.token + self.method % method
         bdata = urlencode(data).encode()
-        _headers = {
+        hdrs = {
             "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
         }
-        _headers.update(headers)
-        async with self.session.post(url, data=bdata, headers=_headers) as response:
+        hdrs.update(headers)
+        async with self.session.post(url, data=bdata, headers=hdrs) as response:
             contents = await response.read()
             contents = json.loads(contents)
         return contents

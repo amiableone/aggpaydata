@@ -128,10 +128,11 @@ class BotCommandManagerMixin:
                     {},
                 )
                 cmd_instance = cmd_class(callback)
+                # Can't change existing command with this method
                 value = self.commands.setdefault(command, cmd_instance)
-                success[command] = True if value == cmd_instance else False
+                success[command] = True if value is cmd_instance else False
             except ValueError:
-                # register_callback raised ValueError.
+                # BotCommandBase.register_callback() raised ValueError.
                 success.append(f"failed: callback must be callable, not {type(callback)}")
         self.__class__.all_set = not bool(success.values())
         # Return success status of each command.

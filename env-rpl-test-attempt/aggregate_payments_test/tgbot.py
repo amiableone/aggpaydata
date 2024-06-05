@@ -15,12 +15,13 @@ class BotCommandBase:
     callback: Optional[Callable] = None
 
     def __init__(self, callback=None, description=None):
-        self.register_callback(callback)
+        if callback:
+            self.register_callback(callback)
         self.description = description
 
     @property
     def command(self):
-        return self.__class__.__name__.lower()
+        return "\\" + self.__class__.__name__.lower()
 
     @property
     def description(self):

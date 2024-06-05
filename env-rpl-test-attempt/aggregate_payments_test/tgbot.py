@@ -8,6 +8,9 @@ from urllib.parse import urlencode
 
 
 class BotCommandBase:
+    """
+    This class represents a command object in Telegram Bot API.
+    """
     _description = ""
     callback: Optional[Callable] = None
 
@@ -40,19 +43,11 @@ class BotCommandBase:
         return self.callback(*args, **kwargs)
 
 
-class Start(BotCommandBase):
-    pass
-
-
-class Help(BotCommandBase):
-    pass
-
-
-class Settings(BotCommandBase):
-    pass
-
-
 class BotBase:
+    """
+    This class manages telegram bot runtime and allows making
+    get and post requests.
+    """
     base_url = "https://api.telegram.org"
     token = "/bot%s"
     method = "/%s"
@@ -107,8 +102,7 @@ class BotBase:
 
 class BotCommandManagerMixin:
     """
-    Adds commands start, help (optional), and
-    settings (optional).
+    This mixin adds command managing features to BotBase subclass.
     """
     commands: Dict[str, BotCommandBase] = {}
     _commands_are_set = False
@@ -172,6 +166,9 @@ class BotCommandManagerMixin:
 
 
 class BotUpdateManagerMixin:
+    """
+    This mixin adds update polling feature to BotBase subclass.
+    """
     allowed_updates = ["message", "edited_message"]
     _get_updates = "getUpdates"
     last_update_date = None

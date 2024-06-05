@@ -76,8 +76,7 @@ class BotBase:
         self.is_running = False
 
     async def get(self, method, data={}):
-        if data and isinstance(data, dict):
-            data = "?" + urlencode(data)
+        data = "?" + urlencode(data) if data else ""
         url = self.token + self.method % method + data
         async with self.session.get(url) as response:
             contents = await response.read()

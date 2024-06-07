@@ -71,11 +71,11 @@ class BotBase:
             self.is_running = True
             self._stop_session = self._loop.create_future()
             await self._stop_session
+        self.is_running = False
+        self._stop_session = None
 
     def stop_session(self):
         self._stop_session.set_result(None)
-        self._stop_session = None
-        self.is_running = False
 
     async def get(self, method, data={}):
         data = "?" + urlencode(data) if data else ""

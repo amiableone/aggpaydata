@@ -83,18 +83,18 @@ class BotBase:
             contents = json.loads(contents)
         return contents
 
-    async def post(self, method, data, headers={}):
-        if not isinstance(data, dict):
-            raise ValueError("data must be dict")
-        if not isinstance(headers, dict):
-            raise ValueError("headers must be dict")
+    async def post(self, method, data, headers={}, as_json=True):
         url = self.token + self.method % method
-        bdata = urlencode(data).encode()
-        hdrs = {
-            "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
-        }
+        if as_json:
+            data = json.dumps(data)
+            hdrs = {"Content-Type": "application/json; charset=utf-8"}
+        else:
+            data = urlencode(data).encode()
+            hdrs = {
+                "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+            }
         hdrs.update(headers)
-        async with self.session.post(url, data=bdata, headers=hdrs) as response:
+        async with self.session.post(url, data=data, headers=hdrs) as response:
             contents = await response.read()
             contents = json.loads(contents)
         return contents

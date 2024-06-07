@@ -21,7 +21,7 @@ class BotCommandBase:
 
     @property
     def command(self):
-        return "\\" + self.__class__.__name__.lower()
+        return self.__class__.__name__.lower()
 
     @property
     def description(self):
@@ -29,7 +29,9 @@ class BotCommandBase:
 
     @description.setter
     def description(self, desc):
-        if isinstance(desc, str):
+        if not desc:
+            self._description = self.__class__.__name__
+        elif isinstance(desc, str):
             self._description = desc.capitalize()[:25]
 
     def register_callback(self, callback):

@@ -108,7 +108,8 @@ class BotCommandManagerMixin:
     """
     commands: Dict[str, BotCommandBase] = {}
     _get_commands = "getMyCommands"
-    all_set = False
+    _set_commands = "setMyCommands"
+    has_unset_commands = False
 
     def add_start(self, callback):
         self.add_commands(start=callback)
@@ -120,35 +121,43 @@ class BotCommandManagerMixin:
         self.add_commands(settings=callback)
 
     def add_commands(self, **commands_callbacks):
-        success = {}
         for command, callback in commands_callbacks.items():
-            try:
-                cmd_class = type(
-                    command.capitalize(),
-                    (BotCommandBase,),
-                    {},
-                )
-                cmd_instance = cmd_class(callback)
-                # Can't change existing command with this method
-                value = self.commands.setdefault(command, cmd_instance)
-                success[command] = True if value is cmd_instance else False
-            except ValueError:
-                # BotCommandBase.register_callback() raised ValueError.
-                success.append(f"failed: callback must be callable, not {type(callback)}")
-        self.__class__.all_set = not bool(success.values())
-        # Return success status of each command.
-        return success
+            if self.commands.get(command, False):
+                continue
+            cmd_class = type(
+                command.capitalize(),
+                (BotCommandBase,),
+                {},
+            )
+            cmd_instance = cmd_class(callback)
+            self.__class__.commands[command] = cmd_instance
+            self.__class__.has_unset_commands = True
 
     async def get_commands(self):
-        try:
-            res = await self.get(self._get_commands)
-            if res["ok"]:
-                return res["result"]
-        except AttributeError:
-            raise TypeError(
-                f"BotBase must be base of this instance class"
-            )
+        res = await self.get(self._get_commands)
+        if res["ok"]:
+            return res["result"]
 
+    async def set_commands(self):
+        """
+        Sets telegram bot commands taken from self.commands.
+        Commands already set but missing from self.commands will be unset.
+        """
+        # TODO:
+        #   Consider making BotComandBase JSON serializable.
+        cmds = {
+            "commands": [],
+        }
+        for name, command in self.commands.items():
+            cmd_dict = {
+                "command": name,
+                "description": command.description,
+            }
+            cmds["commands"].append(cmd_dict)
+        res = await self.post(self._set_commands, cmds)
+        if res["ok"]:
+            self.__class__.has_unset_commands = False
+        return res
 
 
 class BotUpdateManagerMixin:

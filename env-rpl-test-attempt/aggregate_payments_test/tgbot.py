@@ -111,6 +111,12 @@ class BotCommandManagerMixin:
     _set_commands = "setMyCommands"
     has_unset_commands = False
 
+    def __init__(self):
+        # Can't initiate this class on its own.
+        # Use as base of BotBase subclass.
+        # e.g. `class Bot(BotBase, BotCommandManagerMixin):...`
+        raise NotImplementedError
+
     def add_start(self, callback):
         self.add_commands(start=callback)
 
@@ -174,6 +180,12 @@ class BotUpdateManagerMixin:
     timeout = 10
     updates = []
     messages = []
+
+    def __init__(self):
+        # Can't initiate this class on its own.
+        # Use as base of BotBase subclass.
+        # e.g. `class Bot(BotBase, BotUpdateManagerMixin):...`
+        raise NotImplementedError
 
     @classmethod
     def recalculate_lud(cls, date):

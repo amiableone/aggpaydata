@@ -1,3 +1,5 @@
+import quopri
+
 import aiohttp
 import asyncio
 import json
@@ -170,16 +172,18 @@ class BotUpdateManagerMixin:
     """
     This mixin adds update polling feature to BotBase subclass.
     """
-    allowed_updates = ["message", "edited_message"]
     _get_updates = "getUpdates"
-    last_update_date = None
-    last_update_id = 0
+    allowed_updates = ["message", "edited_message"]
     limit = 100
     offset = 1
-    reset_period = timedelta(days=7)
     timeout = 10
-    updates = []
-    messages = []
+
+    # if no update retrieved for 7 days, id of the next update is set randomly
+    _reset_period = timedelta(days=7)
+    last_update_date = None
+    last_update_id = 0
+    updates: asyncio.Queue = asyncio.Queue()
+    queries: asyncio.Queue = asyncio.Queue()
 
     def __init__(self):
         # Can't initiate this class on its own.
@@ -189,8 +193,8 @@ class BotUpdateManagerMixin:
 
     @classmethod
     def recalculate_lud(cls, date):
-        """date is param of update object from Telegram Bot API"""
-        cls.last_update_date = date
+        # `date` is param of Update object from Telegram Bot API.
+        cls.last_update_date = datetime.fromtimestamp(date)
 
     @classmethod
     def recalculate_luid(cls, luid):
@@ -206,21 +210,16 @@ class BotUpdateManagerMixin:
     @classmethod
     def reset_period_expired(cls):
         try:
-            lud = datetime.fromtimestamp(cls.last_update_date)
-            return datetime.today() - lud > cls.reset_period
+            return datetime.today() - cls.last_update_date > cls._reset_period
         except TypeError:
             return False
 
-    def get_updates(self):
+    async def get_updates(self):
         data = self._get_request_data()
-        try:
-            res = self.get(self._get_updates, data)
-        except AttributeError:
-            raise TypeError(
-                f"BotBase must be base of this instance type for this method to work"
-            )
+        res = await self.get(self._get_updates, data)
         if res["ok"]:
-            self.updates = res["result"]
+            for update in res["result"]:
+                self.updates.put_nowait(update)
 
     def _get_request_data(self):
         return {
@@ -231,19 +230,62 @@ class BotUpdateManagerMixin:
         }
 
     def process_updates(self):
+        """
+        Process updates and recalculate offset param.
+        """
         update_id = 0
-        for update in self.updates:
+        date = self.last_update_date
+        while not self.updates.empty():
+            update = self.updates.get_nowait()
             update_id = max(update["update_id"], update_id)
-            try:
-                message = update["message"]
-            except KeyError:
-                message = update["edited_message"]
-            user_input = json.loads(message["text"])
-            if isinstance(user_input, dict):
-                self.messages.append(message)
-        self.updates = []
+            self.process_update(update)
         # Update class attributes
-        date = update.get("date", update.get("edit_date"))
+        date = msg_obj.get("date") or msg_obj.get("edit_date") or date
         self.__class__.recalculate_lud(date)
         self.__class__.recalculate_luid(update_id)
         self.__class__.recalculate_offset()
+
+    def process_update(self, update):
+        """
+        Process update if 'message' in Update or 'edited_message' in Update
+        """
+        try:
+            msg_obj = update.get("message") or update.get("edited_message")
+            if msg_obj:
+                self.process_message(msg_obj)
+        except KeyError:
+            # User input is neither a supported command nor valid input.
+            pass
+
+    def process_message(self, msg_obj):
+        """
+        Parse message for command or query and put processed data into
+        the corresponding queue.
+        """
+        try:
+            chat_id = msg_obj["chat"]["id"]
+            message = msg_obj["text"]
+            if message.startswith("/"):
+                # text is command.
+                pass
+            else:
+                data = self._deserialize(message)
+                self.queries.put_nowait(chat_id + self._parse_query(data))
+        except (
+            json.JSONDecodeError,
+            TypeError,
+            KeyError,
+        ):
+            pass
+
+    def _deserialize(self, text):
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            # next JSONDecodeError will be propagated.
+            return json.loads(text.replace("'", "\""))
+
+    def _parse_query(self, data):
+        # propagate TypeError if not isinstance(data, dict).
+        # propagate KeyError if key not in data.
+        return data["dt_from"], data["dt_upto"], data["group_type"]

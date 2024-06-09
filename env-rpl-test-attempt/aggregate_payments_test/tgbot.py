@@ -16,7 +16,8 @@ class BotCommandBase:
     _description = ""
     callback: Optional[Callable] = None
 
-    def __init__(self, callback=None, description=None):
+    def __init__(self, bot: "BotBase", callback=None, description=None):
+        self.bot = bot
         if callback:
             self.register_callback(callback)
         self.description = description
@@ -45,7 +46,13 @@ class BotCommandBase:
         self.callback = callback
 
     def __call__(self, *args, **kwargs):
-        return self.callback(*args, **kwargs)
+        res = self.callback(*args, **kwargs)
+        try:
+            # this makes __call__ effectively awaitable
+            # when self.callback is a coroutine function.
+            return self.bot._loop.create_task(res)
+        except TypeError:
+            return res
 
 
 class BotBase:

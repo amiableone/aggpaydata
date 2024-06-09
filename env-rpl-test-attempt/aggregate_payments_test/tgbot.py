@@ -168,7 +168,7 @@ class BotCommandManagerMixin:
         return res
 
 
-class BotUpdateManagerMixin:
+class BotUpdateHandlerMixin:
     """
     This mixin adds update polling feature to BotBase subclass.
     """
@@ -184,11 +184,12 @@ class BotUpdateManagerMixin:
     last_update_id = 0
     updates: asyncio.Queue = asyncio.Queue()
     queries: asyncio.Queue = asyncio.Queue()
+    cmds_pending: asyncio.Queue = asyncio.Queue()
 
     def __init__(self):
         # Can't initiate this class on its own.
         # Use as base of BotBase subclass.
-        # e.g. `class Bot(BotBase, BotUpdateManagerMixin):...`
+        # e.g. `class Bot(BotBase, BotUpdateHandlerMixin):...`
         raise NotImplementedError
 
     @classmethod

@@ -230,14 +230,15 @@ class BotUpdateHandlerMixin:
             "allowed_updates": self.allowed_updates,
         }
 
-    def process_updates(self):
+    async def process_updates(self):
         """
         Process updates and recalculate offset param.
         """
         update_id = 0
         date = self.last_update_date
-        while not self.updates.empty():
-            update = self.updates.get_nowait()
+        # while stmt references attr of BotBase.
+        while self.is_running or not self.updates.empty():
+            update = await self.updates.get()
             update_id = max(update["update_id"], update_id)
             self.process_update(update)
         # Update class attributes

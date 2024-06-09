@@ -250,13 +250,9 @@ class BotUpdateHandlerMixin:
         """
         Process update if 'message' in Update or 'edited_message' in Update
         """
-        try:
-            msg_obj = update.get("message") or update.get("edited_message")
-            if msg_obj:
-                self.process_message(msg_obj)
-        except KeyError:
-            # User input is neither a supported command nor valid input.
-            pass
+        msg_obj = update.get("message") or update.get("edited_message")
+        if msg_obj:
+            self.process_message(msg_obj)
 
     def process_message(self, msg_obj):
         """

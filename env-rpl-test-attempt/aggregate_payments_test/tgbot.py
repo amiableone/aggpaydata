@@ -267,11 +267,17 @@ class BotUpdateHandlerMixin:
             chat_id = msg_obj["chat"]["id"]
             message = msg_obj["text"]
             if message.startswith("/"):
-                # text is command.
-                pass
+                # only commands in the beginning of the message are supported.
+                for entity in msg_obj["entities"]:
+                    if entity["type"] == "bot_command":
+                        cmd_end = entity["length"]
+                command, data = message[:cmd_end], message[cmd_end:]
+                cmd_pending = chat_id, command, data
+                self.cmds_pending.put_nowait(cmd_pending)
             else:
                 data = self._deserialize(message)
-                self.queries.put_nowait(chat_id + self._parse_query(data))
+                query = chat_id, *self._parse_query(data)
+                self.queries.put_nowait(query)
         except (
             json.JSONDecodeError,
             TypeError,
@@ -279,12 +285,12 @@ class BotUpdateHandlerMixin:
         ):
             pass
 
-    def _deserialize(self, text):
+    def _deserialize(self, msg):
         try:
-            return json.loads(text)
+            return json.loads(msg)
         except json.JSONDecodeError:
             # next JSONDecodeError will be propagated.
-            return json.loads(text.replace("'", "\""))
+            return json.loads(msg.replace("'", "\""))
 
     def _parse_query(self, data):
         # propagate TypeError if not isinstance(data, dict).

@@ -6,55 +6,69 @@ client = MongoClient()
 sample_db = client.sample_db
 sample_coll = sample_db.sample_collection
 
-input_data = {
-    "dt_from": "2022-09-01T00:00:00",
-    "dt_upto": "2022-12-31T23:59:59",
-    "group_type": "month",
-}
 
-pipeline = [
-    {
-        # Filter out documents with dates outside the provided range
-        "$match": {
-            "dt": {
-                "$gte": datetime.fromisoformat(input_data["dt_from"]),
-                "$lte": datetime.fromisoformat(input_data["dt_upto"]),
-            },
-        },
-    },
-    {
-        # Group by the beginning of the period that each document relates to
-        # based on provided group_type.
-        "$group": {
-            "_id": {
-                "label": {
-                    "$dateTrunc": {
-                        "date": "$dt",
-                        "unit": input_data["group_type"],
+class Aggregator:
+    """
+    Single task class performing aggregation of payment data
+    within specified time period by specified time intervals.
+    """
+    instances = {}
+
+    def __init__(self, id_: int, **params):
+        self.dt_from = params.get("dt_from")
+        if self.dt_from:
+            self.dt_from = datetime.fromisoformat(self.dt_from)
+        self.dt_upto = params.get("dt_upto")
+        if self.dt_upto:
+            self.dt_upto = datetime.fromisoformat(self.dt_upto)
+        self.group_type = params.get("group_type")
+        self.id_ = id_
+        self.__class__.instances[id_] = self
+
+        self.pipeline = [
+            {
+                # Filter out documents with dates outside the provided range
+                "$match": {
+                    "dt": {
+                        "$gte": self.dt_from,
+                        "$lte": self.dt_upto,
                     },
                 },
             },
-            "total_payments": {"$sum": "$value"},
-        },
-    },
-    {
-        "$sort": {"_id.label": 1},
-    },
-    {
-        # Pivot total_payments and _id.label data.
-        "$group": {
-            "_id": None,
-            "dataset": {"$push": "$total_payments"},
-            "labels": {
-                "$push": {
-                    "$dateToString": {
-                        "date": "$_id.label",
-                        "format": "%Y-%m-%dT%H:%M:%S",
+            {
+                # Group by the beginning of the period that each document relates to
+                # based on provided group_type.
+                "$group": {
+                    "_id": {
+                        "label": {
+                            "$dateTrunc": {
+                                "date": "$dt",
+                                "unit": self.group_type,
+                            },
+                        },
+                    },
+                    "total_payments": {"$sum": "$value"},
+                },
+            },
+            {
+                # Sort by label value computed in the previous stage.
+                "$sort": {"_id.label": 1},
+            },
+            {
+                # Pivot total_payments and _id.label data.
+                "$group": {
+                    "_id": None,
+                    "dataset": {"$push": "$total_payments"},
+                    "labels": {
+                        "$push": {
+                            "$dateToString": {
+                                "date": "$_id.label",
+                                "format": "%Y-%m-%dT%H:%M:%S",
+                            },
+                        },
                     },
                 },
             },
-        },
-    },
-    # Exclude _id field from output.
-    {"$project": {"_id": 0}},
-]
+            # Exclude _id field from output.
+            {"$project": {"_id": 0}},
+        ]

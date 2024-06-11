@@ -300,3 +300,7 @@ class BotUpdateHandlerMixin:
         # propagate TypeError if not isinstance(data, dict).
         # propagate KeyError if key not in data.
         return data["dt_from"], data["dt_upto"], data["group_type"]
+
+
+class Bot(BotBase, BotCommandManagerMixin, BotUpdateHandlerMixin):
+    pass

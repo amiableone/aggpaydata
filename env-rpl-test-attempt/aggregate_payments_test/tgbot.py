@@ -158,8 +158,6 @@ class BotCommandManagerMixin:
         Sets telegram bot commands taken from self.commands.
         Commands already set but missing from self.commands will be unset.
         """
-        # TODO:
-        #   Consider making BotComandBase JSON serializable.
         cmds = {
             "commands": [],
         }
@@ -275,12 +273,12 @@ class BotUpdateHandlerMixin:
                 for entity in msg_obj["entities"]:
                     if entity["type"] == "bot_command":
                         cmd_end = entity["length"]
-                command, data = message[:cmd_end], message[cmd_end:]
-                cmd_pending = chat_id, command, data
+                command, params = message[:cmd_end], message[cmd_end:]
+                cmd_pending = chat_id, command, params
                 self.cmds_pending.put_nowait(cmd_pending)
             else:
-                data = self._deserialize(message)
-                query = chat_id, *self._parse_query(data)
+                params = self._deserialize(message)
+                query = chat_id, params
                 self.queries.put_nowait(query)
         except (
             json.JSONDecodeError,
@@ -295,11 +293,6 @@ class BotUpdateHandlerMixin:
         except json.JSONDecodeError:
             # next JSONDecodeError will be propagated.
             return json.loads(msg.replace("'", "\""))
-
-    def _parse_query(self, data):
-        # propagate TypeError if not isinstance(data, dict).
-        # propagate KeyError if key not in data.
-        return data["dt_from"], data["dt_upto"], data["group_type"]
 
 
 class Bot(BotBase, BotCommandManagerMixin, BotUpdateHandlerMixin):

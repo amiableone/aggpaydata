@@ -1,10 +1,9 @@
+import json
+
 from datetime import datetime
 from pprint import pprint
 from pymongo import MongoClient
-
-client = MongoClient()
-sample_db = client.sample_db
-sample_coll = sample_db.sample_collection
+from pymongo.collection import Collection
 
 
 class Aggregator:
@@ -12,20 +11,26 @@ class Aggregator:
     Single task class performing aggregation of payment data
     within specified time period by specified time intervals.
     """
-    instances = {}
 
-    def __init__(self, id_: int, **params):
+    def __init__(self, coll: Collection, **params):
+        self.coll = coll
+        self._missing = []
         self.dt_from = params.get("dt_from")
+        self.dt_upto = params.get("dt_upto")
+        self.group_type = params.get("group_type")
         if self.dt_from:
             self.dt_from = datetime.fromisoformat(self.dt_from)
-        self.dt_upto = params.get("dt_upto")
+        else:
+            self._missing.append("dt_from")
         if self.dt_upto:
             self.dt_upto = datetime.fromisoformat(self.dt_upto)
-        self.group_type = params.get("group_type")
-        self.id_ = id_
-        self.__class__.instances[id_] = self
+        else:
+            self._missing.append("dt_upto")
+        if not self.group_type:
+            self._missing.append("group_type")
 
-        self.pipeline = [
+    def get_pipeline(self):
+        return [
             {
                 # Filter out documents with dates outside the provided range
                 "$match": {
@@ -72,3 +77,11 @@ class Aggregator:
             # Exclude _id field from output.
             {"$project": {"_id": 0}},
         ]
+
+    def aggregate(self):
+        if not self._missing:
+            res = self.coll.aggregate(self.get_pipeline()).next()
+            return json.dumps(res)
+        missing = ", ".join(self._missing)
+        pluralize = "s" if len(self._missing) > 1 else ""
+        return f"Provide param{pluralize} {missing}."

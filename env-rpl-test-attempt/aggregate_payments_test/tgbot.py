@@ -179,7 +179,7 @@ class BotUpdateHandlerMixin:
     allowed_updates = ["message", "edited_message"]
     limit = 100
     offset = 1
-    timeout = 10
+    timeout = 3600*24
 
     # if no update retrieved for 7 days, id of the next update is set randomly
     _reset_period = timedelta(days=7)

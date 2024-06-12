@@ -28,15 +28,8 @@ class BSONReader:
 
 
 class MongoCollectionPopulator:
-    db_name = "sample_db"
-    collection_name = "sample_collection"
-
-    def __init__(self, client: MongoClient, db_name="", collection_name=""):
-        self.db_name = db_name or self.db_name
-        self.collection_name = collection_name or self.collection_name
-        self.client = client
-        self.db = self.client[self.db_name]
-        self.collection = self.db[self.collection_name]
+    def __init__(self, client: MongoClient, db_name, collection_name):
+        self.collection = client[db_name][collection_name]
 
     def populate(self):
         breader = BSONReader()

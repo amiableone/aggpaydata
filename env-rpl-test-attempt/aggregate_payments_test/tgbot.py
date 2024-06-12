@@ -1,5 +1,3 @@
-import quopri
-
 import aiohttp
 import asyncio
 import json

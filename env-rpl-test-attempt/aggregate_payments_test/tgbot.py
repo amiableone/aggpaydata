@@ -240,7 +240,7 @@ class BotUpdateHandlerMixin:
         update_id = 0
         date = self.last_update_date
         # while stmt references attr of BotBase.
-        while self.is_running or not self.updates.empty():
+        while not self.updates.empty():
             update = await self.updates.get()
             update_id = max(update["update_id"], update_id)
             self.process_update(update)
@@ -291,6 +291,11 @@ class BotUpdateHandlerMixin:
         except json.JSONDecodeError:
             # next JSONDecodeError will be propagated.
             return json.loads(msg.replace("'", "\""))
+
+    async def run_polling(self):
+        while self.is_running:
+            await self.get_updates()
+            await self.process_updates()
 
 
 class Bot(BotBase, BotCommandManagerMixin, BotUpdateHandlerMixin):

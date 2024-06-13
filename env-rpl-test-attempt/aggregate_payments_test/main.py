@@ -1,8 +1,10 @@
 import argparse
+import asyncio
 
 from pymongo import MongoClient
 
 from data import MongoCollectionPopulator
+from tgbot import Bot
 
 
 parser = argparse.ArgumentParser(
@@ -38,6 +40,21 @@ parser.add_argument(
     action="store_true",
     help="if True, clear the Mongo collection and fill it with data from bson",
 )
+
+
+async def main(bot: Bot):
+    try:
+        run = asyncio.create_task(bot.run())
+        poll = asyncio.create_task(bot.run_polling())
+        gather = asyncio.gather(
+            run,
+            poll,
+        )
+        await asyncio.shield(gather)
+    except asyncio.CancelledError:
+        bot.stop_session()
+        await gather
+
 
 if __name__ == "__main__":
     args = parser.parse_args()

@@ -14,7 +14,6 @@ class Aggregator:
 
     def __init__(self, coll: Collection):
         self.coll = coll
-        self.aggregations = {}
 
     def get_pipeline(self, dt_from, dt_upto, group_type):
         return [
@@ -81,14 +80,3 @@ class Aggregator:
             self.get_pipeline(dt_from, dt_upto, group_type)
         ).next()
         return json.dumps(res)
-
-    def add_aggregation(self, key, value):
-        """
-        Append the result of self.aggregate() as value to an async queue stored in
-        self.aggregations dict under the key key or create that queue.
-        """
-        try:
-            self.aggregations[key].put_nowait(value)
-        except KeyError:
-            self.aggregations[key] = Queue()
-            self.aggregations[key].put_nowait(value)

@@ -47,24 +47,22 @@ async def handle_query(bot: Bot, agg: Aggregator):
     while bot.is_running:
         chat, params = await bot.queries.get()
         result = agg.aggregate(**params)
-        agg.add_aggregation(chat, result)
+        item = chat, result
+        bot.query_results: asyncio.Queue
+        bot.query_results.put_nowait(item)
 
 
 async def send_messages(
-        bot: Bot,
-        agg: Aggregator,
+        query_results: asyncio.Queue,
         polling_task: asyncio.Task,
 ):
     senders = set()
     while not polling_task.done():
-        aggregations = agg.aggregations.copy()
-        for chat, msg_queue in aggregations.items():
-            messages = [msg_queue.get_nowait() for _ in range(msg_queue.qsize())]
-            for msg in messages:
-                data = {"chat_id": chat, "text": msg}
-                sender = asyncio.create_task(bot.post("sendMessage", data))
-                senders.add(sender)
-                sender.add_done_callback(senders.discard)
+        chat, msg = await query_results.get()
+        data = {"chat_id": chat, "text": msg}
+        sender = asyncio.create_task(bot.post("sendMessage", data))
+        senders.add(sender)
+        sender.add_done_callback(senders.discard)
     await asyncio.gather(*senders)
 
 
@@ -75,8 +73,11 @@ async def main(
     try:
         run = asyncio.create_task(bot.run())
         poll = asyncio.create_task(bot.run_polling())
+        bot.query_results = asyncio.Queue()
         query_handler = asyncio.create_task(handle_query(bot, agg))
-        sender = asyncio.create_task(send_messages(bot, agg, poll))
+        sender = asyncio.create_task(
+            send_messages(bot.query_results, poll)
+        )
         bot.add_tasks(
             poll,
             query_handler,

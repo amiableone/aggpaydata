@@ -5,6 +5,7 @@ from pymongo import MongoClient
 
 from data import MongoCollectionPopulator
 from tgbot import Bot
+from aggregation import Aggregator
 
 
 parser = argparse.ArgumentParser(
@@ -41,6 +42,22 @@ parser.add_argument(
     help="if True, clear the Mongo collection and fill it with data from bson",
 )
 
+
+async def handle_query(bot: Bot, agg: Aggregator):
+    while bot.is_running:
+        query_getter = asyncio.create_task(bot.queries.get())
+        stopper = bot._stop_session
+        done, pending = await asyncio.wait(
+            [query_getter, stopper],
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        first = done.pop()
+        if query_getter is not first:
+            query_getter.cancel()
+            break
+        chat, params = query_getter.result()
+        result = agg.aggregate(**params)
+        agg.add_aggregation(chat, result)
 
 async def main(bot: Bot):
     try:

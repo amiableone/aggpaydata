@@ -69,6 +69,8 @@ class BotBase:
         self.session = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self.is_running = False
+        self._tasks = set()
+        self._work_complete: Optional[asyncio.Future] = None
         self._stop_session: Optional[asyncio.Future] = None
 
     async def run(self):
@@ -77,9 +79,21 @@ class BotBase:
             self._loop = asyncio.get_running_loop()
             self.is_running = True
             self._stop_session = self._loop.create_future()
+            self._work_complete = self._loop.create_future()
             await self._stop_session
-        self.is_running = False
+            self.is_running = False
+            await self._work_complete
         self._stop_session = None
+        self._work_complete = None
+
+    def add_tasks(self, *tasks):
+        for task in tasks:
+            self._tasks.add(task)
+
+    def complete_work(self, task):
+        self._tasks.discard(task)
+        if not self._tasks:
+            self._work_complete.set_result(None)
 
     def stop_session(self):
         self._stop_session.set_result(None)

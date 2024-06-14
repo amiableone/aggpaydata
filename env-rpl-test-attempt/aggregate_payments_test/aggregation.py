@@ -1,7 +1,7 @@
 import json
 
 from datetime import datetime
-from collections import deque
+from asyncio import Queue
 from pymongo import MongoClient
 from pymongo.collection import Collection
 
@@ -84,11 +84,11 @@ class Aggregator:
 
     def add_aggregation(self, key, value):
         """
-        Append the result of self.aggregate() as value to a deque stored in
-        self.aggregations dict under the key key or create that deque.
+        Append the result of self.aggregate() as value to an async queue stored in
+        self.aggregations dict under the key key or create that queue.
         """
         try:
-            self.aggregations[key].append(value)
+            self.aggregations[key].put_nowait(value)
         except KeyError:
-            self.aggregations[key] = deque()
-            self.aggregations[key].append(value)
+            self.aggregations[key] = Queue()
+            self.aggregations[key].put_nowait(value)

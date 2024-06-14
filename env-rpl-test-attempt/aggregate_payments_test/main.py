@@ -45,31 +45,54 @@ parser.add_argument(
 
 async def handle_query(bot: Bot, agg: Aggregator):
     while bot.is_running:
-        query_getter = asyncio.create_task(bot.queries.get())
-        stopper = bot._stop_session
-        done, pending = await asyncio.wait(
-            [query_getter, stopper],
-            return_when=asyncio.FIRST_COMPLETED,
-        )
-        first = done.pop()
-        if query_getter is not first:
-            query_getter.cancel()
-            break
-        chat, params = query_getter.result()
+        chat, params = await bot.queries.get()
         result = agg.aggregate(**params)
         agg.add_aggregation(chat, result)
 
-async def main(bot: Bot):
+
+async def send_messages(
+        bot: Bot,
+        agg: Aggregator,
+        polling_task: asyncio.Task,
+):
+    senders = set()
+    while not polling_task.done():
+        aggregations = agg.aggregations.copy()
+        for chat, msg_queue in aggregations.items():
+            messages = [msg_queue.get_nowait() for _ in range(msg_queue.qsize())]
+            for msg in messages:
+                data = {"chat_id": chat, "text": msg}
+                sender = asyncio.create_task(bot.post("sendMessage", data))
+                senders.add(sender)
+                sender.add_done_callback(senders.discard)
+    await asyncio.gather(*senders)
+
+
+async def main(
+        bot: Bot,
+        agg: Aggregator,
+):
     try:
         run = asyncio.create_task(bot.run())
         poll = asyncio.create_task(bot.run_polling())
+        query_handler = asyncio.create_task(handle_query(bot, agg))
+        sender = asyncio.create_task(send_messages(bot, agg, poll))
+        bot.add_tasks(
+            poll,
+            query_handler,
+            sender,
+        )
         gather = asyncio.gather(
             run,
-            poll,
+            *bot._tasks,
+            return_exceptions=True,
         )
         await asyncio.shield(gather)
     except asyncio.CancelledError:
         bot.stop_session()
+        query_handler.cancel()
+        # poll is not cancelled because it may continue processing updates.
+        # sender is not cancelled for similar reason.
         await gather
 
 

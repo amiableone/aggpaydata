@@ -290,8 +290,9 @@ class BotUpdateHandlerMixin:
                 self.cmds_pending.put_nowait(cmd_pending)
             else:
                 params = self._deserialize(message)
-                query = chat_id, params
-                self.queries.put_nowait(query)
+                if isinstance(params, dict):
+                    query = chat_id, params
+                    self.queries.put_nowait(query)
         except (
             json.JSONDecodeError,
             TypeError,

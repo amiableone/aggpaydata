@@ -12,31 +12,17 @@ class Aggregator:
     within specified time period by specified time intervals.
     """
 
-    def __init__(self, coll: Collection, **params):
+    def __init__(self, coll: Collection):
         self.coll = coll
-        self._missing = []
-        self.dt_from = params.get("dt_from")
-        self.dt_upto = params.get("dt_upto")
-        self.group_type = params.get("group_type")
-        if self.dt_from:
-            self.dt_from = datetime.fromisoformat(self.dt_from)
-        else:
-            self._missing.append("dt_from")
-        if self.dt_upto:
-            self.dt_upto = datetime.fromisoformat(self.dt_upto)
-        else:
-            self._missing.append("dt_upto")
-        if not self.group_type:
-            self._missing.append("group_type")
 
-    def get_pipeline(self):
+    def get_pipeline(self, dt_from, dt_upto, group_type):
         return [
             {
                 # Filter out documents with dates outside the provided range
                 "$match": {
                     "dt": {
-                        "$gte": self.dt_from,
-                        "$lte": self.dt_upto,
+                        "$gte": dt_from,
+                        "$lte": dt_upto,
                     },
                 },
             },
@@ -48,7 +34,7 @@ class Aggregator:
                         "label": {
                             "$dateTrunc": {
                                 "date": "$dt",
-                                "unit": self.group_type,
+                                "unit": group_type,
                             },
                         },
                     },
@@ -78,10 +64,19 @@ class Aggregator:
             {"$project": {"_id": 0}},
         ]
 
-    def aggregate(self):
-        if not self._missing:
-            res = self.coll.aggregate(self.get_pipeline()).next()
-            return json.dumps(res)
-        missing = ", ".join(self._missing)
-        pluralize = "s" if len(self._missing) > 1 else ""
-        return f"Provide param{pluralize} {missing}."
+    def aggregate(self, **params):
+        dt_from = params.get("dt_from")
+        dt_upto = params.get("dt_upto")
+        group_type = params.get("group_type")
+        if not dt_from:
+            return "Param dt_from is missing."
+        if not dt_upto:
+            return "Param dt_upto is missing."
+        if not group_type:
+            return "Params group_type is missing"
+        dt_upto = datetime.fromisoformat(dt_upto)
+        dt_from = datetime.fromisoformat(dt_from)
+        res = self.coll.aggregate(
+            self.get_pipeline(dt_from, dt_upto, group_type)
+        ).next()
+        return json.dumps(res)

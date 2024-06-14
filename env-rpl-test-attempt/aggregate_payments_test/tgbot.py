@@ -88,7 +88,9 @@ class BotBase:
 
     def add_tasks(self, *tasks):
         for task in tasks:
+            task: asyncio.Task
             self._tasks.add(task)
+            task.add_done_callback(self.complete_work)
 
     def complete_work(self, task):
         self._tasks.discard(task)

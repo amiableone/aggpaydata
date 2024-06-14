@@ -1,7 +1,7 @@
 import json
 
 from datetime import datetime
-from pprint import pprint
+from collections import deque
 from pymongo import MongoClient
 from pymongo.collection import Collection
 
@@ -14,6 +14,7 @@ class Aggregator:
 
     def __init__(self, coll: Collection):
         self.coll = coll
+        self.aggregations = {}
 
     def get_pipeline(self, dt_from, dt_upto, group_type):
         return [
@@ -80,3 +81,14 @@ class Aggregator:
             self.get_pipeline(dt_from, dt_upto, group_type)
         ).next()
         return json.dumps(res)
+
+    def add_aggregation(self, key, value):
+        """
+        Append the result of self.aggregate() as value to a deque stored in
+        self.aggregations dict under the key key or create that deque.
+        """
+        try:
+            self.aggregations[key].append(value)
+        except KeyError:
+            self.aggregations[key] = deque()
+            self.aggregations[key].append(value)

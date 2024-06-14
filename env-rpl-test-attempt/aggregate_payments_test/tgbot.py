@@ -195,7 +195,7 @@ class BotUpdateHandlerMixin:
     allowed_updates = ["message", "edited_message"]
     limit = 100
     offset = 1
-    timeout = 3600*24
+    timeout = 3600
 
     # if no update retrieved for 7 days, id of the next update is set randomly
     _reset_period = timedelta(days=7)
@@ -311,7 +311,15 @@ class BotUpdateHandlerMixin:
 
     async def run_polling(self):
         while self.is_running:
-            await self.get_updates()
+            getter = asyncio.create_task(self.get_updates())
+            stopper = self._stop_session
+            done, pending = await asyncio.wait(
+                [getter, stopper], return_when=asyncio.FIRST_COMPLETED,
+            )
+            first = done.pop()
+            if getter is not first:
+                getter.cancel()
+                break
             await self.process_updates()
 
 

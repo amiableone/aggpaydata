@@ -82,4 +82,4 @@ class Aggregator:
             ).next()
             return json.dumps(res)
         except Exception:
-            return "Looks like you provided invalid params."
+            return "Looks like you've provided invalid params."

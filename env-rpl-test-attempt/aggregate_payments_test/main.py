@@ -133,7 +133,7 @@ async def log_state(bot: Bot):
             "    Session is open: %s.",
             bot.is_running,
             [task._coro.__name__ for task in bot._tasks],
-            not bot.session.closed(),
+            not bot.session.closed,
         )
         if bot._work_complete.done():
             break
@@ -177,8 +177,9 @@ async def main(
         await asyncio.shield(gather)
     except asyncio.CancelledError:
         bot.stop_session()
-        # cancel query_handler to cease getting new updates and allow other tasks
-        # finish working on updates retrieved before stop_session() was called.
+        # cancel query_handler and cmd_handler to cease getting new updates and
+        # allow other tasks finish working on updates retrieved before stop_session()
+        # was called.
         query_handler.cancel()
         await gather
 

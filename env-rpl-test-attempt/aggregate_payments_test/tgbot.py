@@ -288,11 +288,11 @@ class BotUpdateHandlerMixin:
             update = self.updates.get_nowait()
             msg_obj = update.get("message") or update.get("edited_message")
             self.process_message(msg_obj)
-        # Update class attributes
-        date = msg_obj.get("date") or msg_obj.get("edit_date") or date
-        self.__class__.recalculate_lud(date)
-        self.__class__.recalculate_luid(update["update_id"])
-        self.__class__.recalculate_offset()
+            # Update class attributes
+            date = msg_obj.get("date") or msg_obj.get("edit_date") or date
+            self.__class__.recalculate_lud(date)
+            self.__class__.recalculate_luid(update["update_id"])
+            self.__class__.recalculate_offset()
         logger.info("New update offset value is %s", self.offset)
 
     def process_message(self, msg_obj):

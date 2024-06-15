@@ -74,9 +74,12 @@ class Aggregator:
             return "Param dt_upto is missing."
         if not group_type:
             return "Params group_type is missing"
-        dt_upto = datetime.fromisoformat(dt_upto)
-        dt_from = datetime.fromisoformat(dt_from)
-        res = self.coll.aggregate(
-            self.get_pipeline(dt_from, dt_upto, group_type)
-        ).next()
-        return json.dumps(res)
+        try:
+            dt_upto = datetime.fromisoformat(dt_upto)
+            dt_from = datetime.fromisoformat(dt_from)
+            res = self.coll.aggregate(
+                self.get_pipeline(dt_from, dt_upto, group_type)
+            ).next()
+            return json.dumps(res)
+        except Exception:
+            return "Looks like you provided invalid params."

@@ -1,10 +1,14 @@
 import aiohttp
 import asyncio
 import json
+import logging
 
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Callable
 from urllib.parse import urlencode
+
+
+logger = logging.getLogger("Bot")
 
 
 class BotCommandBase:
@@ -19,6 +23,7 @@ class BotCommandBase:
         if callback:
             self.register_callback(callback)
         self.description = description
+        logger.info("Created command %s", self.command)
 
     @property
     def command(self):
@@ -45,6 +50,7 @@ class BotCommandBase:
 
     def __call__(self, *args, **kwargs):
         res = self.callback(*args, **kwargs)
+        logger.info("Called command /%s", self.command)
         try:
             # this makes __call__ effectively awaitable
             # when self.callback is a coroutine function.
@@ -80,20 +86,31 @@ class BotBase:
             self.is_running = True
             self._stop_session = self._loop.create_future()
             self._work_complete = self._loop.create_future()
+            logger.info("Bot is set and running.")
             await self._stop_session
             self.is_running = False
+            logger.info("Bot is stopping...")
             await self._work_complete
         self._stop_session = None
         self._work_complete = None
+        logger.info("Bot is stopped.")
 
     def add_tasks(self, *tasks):
         for task in tasks:
             task: asyncio.Task
             self._tasks.add(task)
             task.add_done_callback(self.complete_work)
+            logger.debug(
+                "Task wrapping coro '%s' is added to the bot.",
+                task._coro.__name__,
+            )
 
     def complete_work(self, task):
         self._tasks.discard(task)
+        logger.debug(
+            "Task wrapping coro %s is finished and removed from the bot.",
+            task._coro.__name__,
+        )
         if not self._tasks:
             self._work_complete.set_result(None)
 
@@ -135,7 +152,7 @@ class BotCommandManagerMixin:
     has_unset_commands = False
 
     def __init__(self):
-        # Can't initiate this class on its own.
+        # Can't instantiate this class on its own.
         # Use as base of BotBase subclass.
         # e.g. `class Bot(BotBase, BotCommandManagerMixin):...`
         raise NotImplementedError
@@ -181,9 +198,11 @@ class BotCommandManagerMixin:
                 "description": command.description,
             }
             cmds["commands"].append(cmd_dict)
+        logger.info("Setting commands %s", cmds)
         res = await self.post(self._set_commands, cmds)
         if res["ok"]:
             self.__class__.has_unset_commands = False
+        logger.info("Commands are set.")
         return res
 
 
@@ -206,7 +225,7 @@ class BotUpdateHandlerMixin:
     cmds_pending: asyncio.Queue = asyncio.Queue()
 
     def __init__(self):
-        # Can't initiate this class on its own.
+        # Can't instantiate this class on its own.
         # Use as base of BotBase subclass.
         # e.g. `class Bot(BotBase, BotUpdateHandlerMixin):...`
         raise NotImplementedError
@@ -238,6 +257,7 @@ class BotUpdateHandlerMixin:
         data = self._get_request_data()
         getter = asyncio.create_task(self.get(self._get_updates, data))
         stopper = self._stop_session
+        logger.debug("Waiting for updates...")
         done, pending = await asyncio.wait(
             [getter, stopper], return_when=asyncio.FIRST_COMPLETED,
         )
@@ -273,6 +293,7 @@ class BotUpdateHandlerMixin:
         self.__class__.recalculate_lud(date)
         self.__class__.recalculate_luid(update["update_id"])
         self.__class__.recalculate_offset()
+        logger.info("New update offset value is %s", self.offset)
 
     def process_message(self, msg_obj):
         """
@@ -282,6 +303,7 @@ class BotUpdateHandlerMixin:
         try:
             chat_id = msg_obj["chat"]["id"]
             message = msg_obj["text"]
+            logger.info("Received message '%s' from chat %s", message, chat_id)
             if message.startswith("/"):
                 # only commands in the beginning of the message are supported.
                 for entity in msg_obj["entities"]:
@@ -310,9 +332,13 @@ class BotUpdateHandlerMixin:
             return json.loads(msg.replace("'", "\""))
 
     async def run_polling(self):
-        while self.is_running:
-            await self.get_updates()
-            self.process_updates()
+        logger.info("Polling procedure initiated.")
+        try:
+            while self.is_running:
+                await self.get_updates()
+                self.process_updates()
+        except Exception as exc:
+            logger.exception("Exception in run_polling: %s", exc)
 
 
 class Bot(BotBase, BotCommandManagerMixin, BotUpdateHandlerMixin):

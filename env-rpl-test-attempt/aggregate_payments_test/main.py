@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import logging
 
 from functools import partial
 from pymongo import MongoClient
@@ -8,6 +9,8 @@ from data import MongoCollectionPopulator
 from tgbot import Bot
 from aggregation import Aggregator
 
+
+logger = logging.getLogger(__name__)
 
 parser = argparse.ArgumentParser(
     description="Run PaymentDataAggregator telegram bot.",
@@ -46,6 +49,11 @@ parser.add_argument(
     "--refill",
     action="store_true",
     help="if True, clear the Mongo collection and fill it with data from bson",
+)
+parser.add_argument(
+    "--debug", "-d",
+    action="store_true",
+    help="run in debug mode to see more detailed logs",
 )
 
 
@@ -87,6 +95,7 @@ async def handle_cmds(
         handler = bot.commands[cmd](chat, params)
         handlers.add(handler)
         handler.add_done_callback(handlers.discard)
+        logger.debug("Handling command /%s from chat %s.", cmd, chat)
     await asyncio.gather(*handlers)
 
 
@@ -110,14 +119,38 @@ async def send_messages(
         sender = asyncio.create_task(bot.post("sendMessage", data))
         senders.add(sender)
         sender.add_done_callback(senders.discard)
+        logger.debug("Sending query results to chat %s", chat)
     await asyncio.gather(*senders)
+
+
+async def log_state(bot: Bot):
+    while True:
+        await asyncio.sleep(60)
+        logger.debug(
+            "\n"
+            "    Bot is running: %s.\n"
+            "    Tasks pending: %s.\n"
+            "    Session is open: %s.",
+            bot.is_running,
+            [task._coro.__name__ for task in bot._tasks],
+            not bot.session.closed(),
+        )
+        if bot._work_complete.done():
+            break
 
 
 async def main(
         bot: Bot,
-        set_commands: bool,
         agg: Aggregator,
+        set_commands: bool,
+        debug: bool,
 ):
+
+    logging.basicConfig(
+        format="%(name)s:%(asctime)s:%(funcName)s::%(message)s",
+        level=logging.DEBUG if debug else logging.INFO,
+    )
+    logger.debug("Running in debug mode.")
     try:
         if set_commands:
             await bot.set_commands()
@@ -133,8 +166,11 @@ async def main(
             sender,
             cmd_handler,
         )
+        tasks = [run]
+        if debug:
+            tasks.append(asyncio.create_task(log_state(bot)))
         gather = asyncio.gather(
-            run,
+            *tasks,
             *bot._tasks,
             return_exceptions=True,
         )
@@ -150,10 +186,12 @@ async def main(
 if __name__ == "__main__":
     args = parser.parse_args()
     client = MongoClient(args.host, args.port)
+    logger.info("Connected to MongoDB.")
     # Set up collection in database.
     if args.refill:
         # Use --refill flag when using db or collection name for the first time.
         MongoCollectionPopulator(client, args.db, args.collection).populate()
+        logger.info("Mongo collection populated.")
     coll = client[args.db][args.collection]
     bot = Bot(args.token)
     start_cb = partial(_start_cb, bot)
@@ -162,4 +200,11 @@ if __name__ == "__main__":
     bot.commands["start"].description = "Let me introduce myself."
     bot.commands["help"].description = "Let me assist you."
     agg = Aggregator(coll)
-    asyncio.run(main(bot, args.set_commands, agg))
+    asyncio.run(
+        main(
+            bot,
+            agg,
+            args.set_commands,
+            args.debug,
+        )
+    )

@@ -199,7 +199,7 @@ class BotUpdateHandlerMixin:
 
     # if no update retrieved for 7 days, id of the next update is set randomly
     _reset_period = timedelta(days=7)
-    last_update_date = None
+    last_update_date = datetime.today() - timedelta(days=7)
     last_update_id = 0
     updates: asyncio.Queue = asyncio.Queue()
     queries: asyncio.Queue = asyncio.Queue()
@@ -236,7 +236,16 @@ class BotUpdateHandlerMixin:
 
     async def get_updates(self):
         data = self._get_request_data()
-        res = await self.get(self._get_updates, data)
+        getter = asyncio.create_task(self.get(self._get_updates, data))
+        stopper = self._stop_session
+        done, pending = await asyncio.wait(
+            [getter, stopper], return_when=asyncio.FIRST_COMPLETED,
+        )
+        first = done.pop()
+        if getter is not first:
+            getter.cancel()
+            return
+        res = getter.result()
         if res["ok"]:
             for update in res["result"]:
                 self.updates.put_nowait(update)
@@ -249,30 +258,21 @@ class BotUpdateHandlerMixin:
             "allowed_updates": self.allowed_updates,
         }
 
-    async def process_updates(self):
+    def process_updates(self):
         """
         Process updates and recalculate offset param.
         """
-        update_id = 0
         date = self.last_update_date
         # while stmt references attr of BotBase.
         while not self.updates.empty():
-            update = await self.updates.get()
-            update_id = max(update["update_id"], update_id)
-            self.process_update(update)
+            update = self.updates.get_nowait()
+            msg_obj = update.get("message") or update.get("edited_message")
+            self.process_message(msg_obj)
         # Update class attributes
         date = msg_obj.get("date") or msg_obj.get("edit_date") or date
         self.__class__.recalculate_lud(date)
-        self.__class__.recalculate_luid(update_id)
+        self.__class__.recalculate_luid(update["update_id"])
         self.__class__.recalculate_offset()
-
-    def process_update(self, update):
-        """
-        Process update if 'message' in Update or 'edited_message' in Update
-        """
-        msg_obj = update.get("message") or update.get("edited_message")
-        if msg_obj:
-            self.process_message(msg_obj)
 
     def process_message(self, msg_obj):
         """
@@ -311,16 +311,8 @@ class BotUpdateHandlerMixin:
 
     async def run_polling(self):
         while self.is_running:
-            getter = asyncio.create_task(self.get_updates())
-            stopper = self._stop_session
-            done, pending = await asyncio.wait(
-                [getter, stopper], return_when=asyncio.FIRST_COMPLETED,
-            )
-            first = done.pop()
-            if getter is not first:
-                getter.cancel()
-                break
-            await self.process_updates()
+            await self.get_updates()
+            self.process_updates()
 
 
 class Bot(BotBase, BotCommandManagerMixin, BotUpdateHandlerMixin):

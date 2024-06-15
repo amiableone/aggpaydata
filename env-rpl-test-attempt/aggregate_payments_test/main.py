@@ -43,6 +43,32 @@ parser.add_argument(
 )
 
 
+async def _start_cb(bot: Bot, chat_id, *args):
+    text = (
+        "Hi.\n"
+        "I'm a payment aggregator bot.\n"
+        "To check what I can do please use /help command."
+    )
+    data = {"chat_id": chat_id, "text": text}
+    await bot.post("sendMessage", data)
+
+
+async def _help_cb(bot: Bot, chat_id, *args):
+    text = (
+        "To make a query, send me params of the query in the following form:\n"
+        "{\n"
+        "\"dt_from\":\"2022-09-01T00:00:00\",\n"
+        "\"dt_upto\":\"2022-12-31T23:59:00\",\n"
+        "\"group_type\":\"month\"\n"
+        "}\n"
+        "Available values for the 'group_type' param are 'month', 'week', 'day', "
+        "'hour'.\n"
+        "Be sure to use double quotes, not single ones."
+    )
+    data = {"chat_id": chat_id, "text": text}
+    await bot.post("sendMessage", data)
+
+
 async def handle_query(bot: Bot, agg: Aggregator):
     while bot.is_running:
         chat, params = await bot.queries.get()

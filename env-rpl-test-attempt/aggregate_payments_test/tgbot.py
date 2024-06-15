@@ -158,7 +158,7 @@ class BotCommandManagerMixin:
                 (BotCommandBase,),
                 {},
             )
-            cmd_instance = cmd_class(callback)
+            cmd_instance = cmd_class(self, callback)
             self.__class__.commands[command] = cmd_instance
             self.__class__.has_unset_commands = True
 
@@ -287,7 +287,7 @@ class BotUpdateHandlerMixin:
                 for entity in msg_obj["entities"]:
                     if entity["type"] == "bot_command":
                         cmd_end = entity["length"]
-                command, params = message[:cmd_end], message[cmd_end:]
+                command, params = message[1:cmd_end], message[cmd_end:]
                 cmd_pending = chat_id, command, params
                 self.cmds_pending.put_nowait(cmd_pending)
             else:

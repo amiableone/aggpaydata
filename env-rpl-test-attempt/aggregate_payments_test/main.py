@@ -69,6 +69,21 @@ async def _help_cb(bot: Bot, chat_id, *args):
     await bot.post("sendMessage", data)
 
 
+async def handle_cmds(
+        bot: Bot,
+        polling_task: asyncio.Task,
+):
+    handlers = set()
+    while not polling_task.done():
+        chat, cmd, params = await cmds.get()
+        # For the sake of this program, it's assumed that only coro funcs are
+        # provided as callbacks to bot commands.
+        handler = bot.commands[cmd](chat, params)
+        handlers.add(handler)
+        handler.add_done_callback(handlers.discard)
+    await asyncio.gather(*handlers)
+
+
 async def handle_query(bot: Bot, agg: Aggregator):
     while bot.is_running:
         chat, params = await bot.queries.get()
@@ -102,10 +117,12 @@ async def main(
         bot.query_results = asyncio.Queue()
         query_handler = asyncio.create_task(handle_query(bot, agg))
         sender = asyncio.create_task(send_messages(bot, poll))
+        cmd_handler = asyncio.create_task(handle_cmds(bot, poll))
         bot.add_tasks(
             poll,
             query_handler,
             sender,
+            cmd_handler,
         )
         gather = asyncio.gather(
             run,
@@ -115,9 +132,9 @@ async def main(
         await asyncio.shield(gather)
     except asyncio.CancelledError:
         bot.stop_session()
+        # cancel query_handler to cease getting new updates and allow other tasks
+        # finish working on updates retrieved before stop_session() was called.
         query_handler.cancel()
-        # poll is not cancelled because it may continue processing updates.
-        # sender is not cancelled for similar reason.
         await gather
 
 

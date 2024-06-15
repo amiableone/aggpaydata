@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 
+from functools import partial
 from pymongo import MongoClient
 
 from data import MongoCollectionPopulator
@@ -14,6 +15,11 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     "token",
     help="bot token for PaymentDataAggregator provided by BotFather",
+)
+parser.add_argument(
+    "--set-commands",
+    help="use this flag when adding a new command to the bot.",
+    action="store_true",
 )
 parser.add_argument(
     "--host",
@@ -109,9 +115,12 @@ async def send_messages(
 
 async def main(
         bot: Bot,
+        set_commands: bool,
         agg: Aggregator,
 ):
     try:
+        if set_commands:
+            await bot.set_commands()
         run = asyncio.create_task(bot.run())
         poll = asyncio.create_task(bot.run_polling())
         bot.query_results = asyncio.Queue()
@@ -140,11 +149,17 @@ async def main(
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    # Connect to mongodb.
     client = MongoClient(args.host, args.port)
     # Set up collection in database.
     if args.refill:
         # Use --refill flag when using db or collection name for the first time.
         MongoCollectionPopulator(client, args.db, args.collection).populate()
-    db = client[args.db]
-    coll = db[args.collection]
+    coll = client[args.db][args.collection]
+    bot = Bot(args.token)
+    start_cb = partial(_start_cb, bot)
+    help_cb = partial(_help_cb, bot)
+    bot.add_commands(start=start_cb, help=help_cb)
+    bot.commands["start"].description = "Let me introduce myself."
+    bot.commands["help"].description = "Let me assist you."
+    agg = Aggregator(coll)
+    asyncio.run(main(bot, args.set_commands, agg))

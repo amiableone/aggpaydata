@@ -79,12 +79,12 @@ async def handle_query(bot: Bot, agg: Aggregator):
 
 
 async def send_messages(
-        query_results: asyncio.Queue,
+        bot: Bot,
         polling_task: asyncio.Task,
 ):
     senders = set()
     while not polling_task.done():
-        chat, msg = await query_results.get()
+        chat, msg = await bot.query_results.get()
         data = {"chat_id": chat, "text": msg}
         sender = asyncio.create_task(bot.post("sendMessage", data))
         senders.add(sender)
@@ -101,9 +101,7 @@ async def main(
         poll = asyncio.create_task(bot.run_polling())
         bot.query_results = asyncio.Queue()
         query_handler = asyncio.create_task(handle_query(bot, agg))
-        sender = asyncio.create_task(
-            send_messages(bot.query_results, poll)
-        )
+        sender = asyncio.create_task(send_messages(bot, poll))
         bot.add_tasks(
             poll,
             query_handler,

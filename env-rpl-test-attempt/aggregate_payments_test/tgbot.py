@@ -32,7 +32,7 @@ class BotCommandBase:
     def description(self, desc):
         try:
             self._description = desc.capitalize()[:25]
-        except TypeError:
+        except AttributeError:
             self._description = self.__class__.__name__
 
     def register_callback(self, callback):

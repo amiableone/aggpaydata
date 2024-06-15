@@ -81,7 +81,7 @@ async def handle_cmds(
 ):
     handlers = set()
     while not polling_task.done():
-        chat, cmd, params = await cmds.get()
+        chat, cmd, params = await bot.cmds_pending.get()
         # For the sake of this program, it's assumed that only coro funcs are
         # provided as callbacks to bot commands.
         handler = bot.commands[cmd](chat, params)

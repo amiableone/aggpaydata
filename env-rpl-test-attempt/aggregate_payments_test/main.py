@@ -203,13 +203,17 @@ if __name__ == "__main__":
         MongoCollectionPopulator(client, args.db, args.collection).populate()
         logger.info("Mongo collection populated.")
     coll = client[args.db][args.collection]
-    bot = Bot(args.token)
-    start_cb = partial(_start_cb, bot)
-    help_cb = partial(_help_cb, bot)
-    bot.add_commands(start=start_cb, help=help_cb)
-    bot.commands["start"].description = "Let me introduce myself."
-    bot.commands["help"].description = "Let me assist you."
     agg = Aggregator(coll)
+
+    bot = Bot(args.token)
+    if args.set_commands:
+        start_cb = partial(_start_cb, bot)
+        help_cb = partial(_help_cb, bot)
+        bot.add_commands(start=start_cb, help=help_cb)
+        bot.commands["start"].description = "Let me introduce myself."
+        bot.commands["help"].description = "Let me assist you."
+        # Set commands with BotFather by sending a coresponding request from main().
+
     asyncio.run(
         main(
             bot,

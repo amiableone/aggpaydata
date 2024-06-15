@@ -163,8 +163,6 @@ async def main(
     )
     logger.debug("Running in debug mode.")
     try:
-        if set_commands:
-            await bot.set_commands()
         run = asyncio.create_task(bot.run())
         poll = asyncio.create_task(bot.run_polling())
         bot.query_results = asyncio.Queue()
@@ -178,6 +176,8 @@ async def main(
             cmd_handler,
         )
         tasks = [run]
+        if set_commands:
+            tasks.append(asyncio.create_task(bot.set_commands()))
         if debug:
             tasks.append(asyncio.create_task(log_state(bot)))
         gather = asyncio.gather(

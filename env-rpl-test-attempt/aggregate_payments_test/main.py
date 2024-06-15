@@ -77,18 +77,16 @@ async def _help_cb(bot: Bot, chat_id, *args):
         "}\n"
         "Available values for the 'group_type' param are 'month', 'week', 'day', "
         "'hour'.\n"
-        "Be sure to use double quotes, not single ones."
+        "Be sure to use double quotes, not single ones.\n"
+        "If you made a mistake in your query, just edit it."
     )
     data = {"chat_id": chat_id, "text": text}
     await bot.post("sendMessage", data)
 
 
-async def handle_cmds(
-        bot: Bot,
-        polling_task: asyncio.Task,
-):
+async def handle_cmds(bot: Bot):
     handlers = set()
-    while not polling_task.done():
+    while bot.is_running:
         chat, cmd, params = await bot.cmds_pending.get()
         # For the sake of this program, it's assumed that only coro funcs are
         # provided as callbacks to bot commands.
@@ -110,11 +108,21 @@ async def handle_query(bot: Bot, agg: Aggregator):
 
 async def send_messages(
         bot: Bot,
-        polling_task: asyncio.Task,
+        poller: asyncio.Task,
 ):
     senders = set()
-    while not polling_task.done():
-        chat, msg = await bot.query_results.get()
+    while bot.is_running:
+        getter = asyncio.create_task(bot.query_results.get())
+        done, pending = await asyncio.wait(
+            [getter, poller],
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        first = done.pop()
+        if getter is not first:
+            await asyncio.gather(*senders)
+            getter.cancel()
+            return
+        chat, msg = getter.result()
         data = {"chat_id": chat, "text": msg}
         sender = asyncio.create_task(bot.post("sendMessage", data))
         senders.add(sender)
@@ -159,7 +167,7 @@ async def main(
         bot.query_results = asyncio.Queue()
         query_handler = asyncio.create_task(handle_query(bot, agg))
         sender = asyncio.create_task(send_messages(bot, poll))
-        cmd_handler = asyncio.create_task(handle_cmds(bot, poll))
+        cmd_handler = asyncio.create_task(handle_cmds(bot))
         bot.add_tasks(
             poll,
             query_handler,
@@ -181,6 +189,7 @@ async def main(
         # allow other tasks finish working on updates retrieved before stop_session()
         # was called.
         query_handler.cancel()
+        cmd_handler.cancel()
         await gather
 
 

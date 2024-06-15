@@ -30,10 +30,10 @@ class BotCommandBase:
 
     @description.setter
     def description(self, desc):
-        if not desc:
-            self._description = self.__class__.__name__
-        elif isinstance(desc, str):
+        try:
             self._description = desc.capitalize()[:25]
+        except TypeError:
+            self._description = self.__class__.__name__
 
     def register_callback(self, callback):
         """

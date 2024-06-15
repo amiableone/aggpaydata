@@ -90,7 +90,10 @@ async def handle_cmds(bot: Bot):
         chat, cmd, params = await bot.cmds_pending.get()
         # For the sake of this program, it's assumed that only coro funcs are
         # provided as callbacks to bot commands.
-        handler = bot.commands[cmd](chat, params)
+        try:
+            handler = bot.commands[cmd](chat, params)
+        except KeyError:
+            continue
         handlers.add(handler)
         handler.add_done_callback(handlers.discard)
         logger.debug("Handling command /%s from chat %s.", cmd, chat)
